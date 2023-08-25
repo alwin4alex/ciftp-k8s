@@ -14,16 +14,16 @@ spec:
     spec:
     containers:
     - name: service-registry
-      image: "https://harbor.sorakh.io/project-ciftp/registry-service:main"
+      image: https://harbor.sorakh.io/project-ciftp/registry-service:main
       ports:
       - containerPort: 8761
     restartPolicy: Always
 
 ---
-
-apiVersion: v1
-kind: Service
+apiVersion: apps/v1
+kind: Deployment
 metadata:
+  name: api-gateway-service
   spec:
   replicas: 1
   selector:
@@ -36,16 +36,17 @@ metadata:
     spec:
       containers:
       - name: api-gateway-service
-        image: https://harbor.sorakh.io/project-ciftp//api-gateway-service:main
+        image: https://harbor.sorakh.io/project-ciftp/api-gateway-service:main
         ports:
         - containerPort: 8765
       restartPolicy: Always
 
 ---
-apiVersion: v1
-kind: Service
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  spec:
+  name: auth-service
+spec:
   replicas: 1
   selector:
     matchLabels:
@@ -56,9 +57,18 @@ metadata:
         app: auth-service
     spec:
       containers:
-      - name: auth-service
-        image: harbor.sorakh.io/harbor/auth-service:main
+        - name: auth-service
+          image: https://harbor.sorakh.io/project-ciftp/auth-service:main
+          env:
+            - name: DB_USER
+              value: "${AUTH_DB_USER}"
+            - name: DB_PASSWORD
+              value: "${AUTH_DB_PASSWORD}"
+            # Add other environment variables from *x-backend-environment here
+
       restartPolicy: Always
+  dependsOn:
+    - name: service-registry
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -76,7 +86,7 @@ spec:
     spec:
       containers:
       - name: participant-service
-        image: "${DOCKER_REGISTRY_URL}/participant-service:main"
+        image: https://harbor.sorakh.io/project-ciftp/participant-service:main
         env:
         - name: DB_USER
           value: "${PARTICIPANT_DB_USER}"
@@ -84,3 +94,130 @@ spec:
           value: "${PARTICIPANT_DB_PASSWORD}"
 
       restartPolicy: Always
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: request-change-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: request-change-service
+  template:
+    metadata:
+      labels:
+        app: request-change-service
+    spec:
+      containers:
+      - name: request-change-service
+        image: https://harbor.sorakh.io/project-ciftp/ciftp-core-rqc:main
+        env:
+        - name: DB_USER
+          value: "${RQC_DB_USER:}"
+        - name: DB_PASSWORD
+          value: "${RQC_DB_PASSWORD}"
+
+      restartPolicy: Always
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: https://harbor.sorakh.io/project-ciftp/notification-service:main
+          env:
+            - name: DB_USER
+              value: "${NOTIFICATION_USER}"
+            - name: DB_PASSWORD
+              value: "${NOTIFICATION_PASSWORD}"
+            - name: MAIL_HOST
+              value: "${MAIL_HOST}"
+            - name: MAIL_PORT
+              value: "${MAIL_PORT}"
+            - name: MAIL_USER
+              value: "${MAIL_USER}"
+            - name: MAIL_PASSWORD
+              value: "${MAIL_PASSWORD}"
+            - name: MAIL_SSL_ENABLE
+              value: "${MAIL_SSL_ENABLE:-true}"
+      restartPolicy: Always
+  dependsOn:
+    - name: service-registry
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: transaction-service
+  template:
+    metadata:
+      labels:
+        app: transaction-service
+    spec:
+      containers:
+        - name: transaction-service
+          image: https://harbor.sorakh.io/project-ciftp/transaction-service:main
+          env:
+            - name: DB_USER
+              value: "${TRX_USER}"
+            - name: DB_PASSWORD
+              value: "${TRX_USER_PASSWORD}"
+      restartPolicy: Always
+  dependsOn:
+    - name: service-registry
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend-service
+  template:
+    metadata:
+      labels:
+        app: frontend-service
+    spec:
+      containers:
+        - name: frontend-service
+          image: https://harbor.sorakh.io/project-ciftp/ciftp-core-frontend:1.0.0-rc-6
+          env:
+            - name: BACKEND_ADDR
+              value: "${BACKEND_ADDR}"
+            # Add other environment variables from *x-platform-manifest here
+          ports:
+            - containerPort: 80
+      restartPolicy: Always
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+

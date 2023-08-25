@@ -64,7 +64,6 @@ spec:
               value: "${AUTH_DB_USER}"
             - name: DB_PASSWORD
               value: "${AUTH_DB_PASSWORD}"
-            # Add other environment variables from *x-backend-environment here
 
       restartPolicy: Always
   dependsOn:

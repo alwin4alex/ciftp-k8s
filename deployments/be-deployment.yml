@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-registry
+  template:
+    metadata:
+      labels:
+        app: service-registry
+    spec:
+    containers:
+    - name: service-registry
+      image: "https://harbor.sorakh.io/project-ciftp/registry-service:main"
+      ports:
+      - containerPort: 8761
+    restartPolicy: Always
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway-service
+  template:
+    metadata:
+      labels:
+        app: api-gateway-service
+    spec:
+      containers:
+      - name: api-gateway-service
+        image: https://harbor.sorakh.io/project-ciftp//api-gateway-service:main
+        ports:
+        - containerPort: 8765
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: harbor.sorakh.io/harbor/auth-service:main
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: participant-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: participant-service
+  template:
+    metadata:
+      labels:
+        app: participant-service
+    spec:
+      containers:
+      - name: participant-service
+        image: "${DOCKER_REGISTRY_URL}/participant-service:main"
+        env:
+        - name: DB_USER
+          value: "${PARTICIPANT_DB_USER}"
+        - name: DB_PASSWORD
+          value: "${PARTICIPANT_DB_PASSWORD}"
+
+      restartPolicy: Always

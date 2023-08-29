@@ -1,0 +1,1 @@
+kubectl create secret docker-registry harbor-registry-secret --docker-server="https://harbor.sorakh.io/" --docker-username="pich@sorakh" --docker-password="Don't4getme#"

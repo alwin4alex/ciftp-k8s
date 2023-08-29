@@ -12,19 +12,21 @@ spec:
       labels:
         app: service-registry
     spec:
-    containers:
-    - name: service-registry
-      image: https://harbor.sorakh.io/project-ciftp/registry-service:main
-      ports:
-      - containerPort: 8761
-    restartPolicy: Always
+      imagePullSecrets:
+        - name: harbor-registry-secret
+      containers:
+        - name: service-registry
+          image: harbor.sorakh.io/project-ciftp/registry-service:main
+          ports:
+            - containerPort: 8761
+      restartPolicy: Always
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway-service
-  spec:
+spec:
   replicas: 1
   selector:
     matchLabels:
@@ -34,11 +36,16 @@ metadata:
       labels:
         app: api-gateway-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
-      - name: api-gateway-service
-        image: https://harbor.sorakh.io/project-ciftp/api-gateway-service:main
-        ports:
-        - containerPort: 8765
+        - name: api-gateway-service
+          envFrom:
+            - configMapRef:
+                name: ciftp-env
+          image: harbor.sorakh.io/project-ciftp/api-gateway-service:main
+          ports:
+          - containerPort: 8765
       restartPolicy: Always
 
 ---
@@ -56,18 +63,21 @@ spec:
       labels:
         app: auth-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: auth-service
-          image: https://harbor.sorakh.io/project-ciftp/auth-service:main
+          image: harbor.sorakh.io/project-ciftp/auth-service:main
+          envFrom:
+            - configMapRef:
+                name: ciftp-env
           env:
-            - name: DB_USER
+            - name: "DB_USER"
               value: "${AUTH_DB_USER}"
             - name: DB_PASSWORD
               value: "${AUTH_DB_PASSWORD}"
 
       restartPolicy: Always
-  dependsOn:
-    - name: service-registry
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -83,9 +93,14 @@ spec:
       labels:
         app: participant-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
       - name: participant-service
-        image: https://harbor.sorakh.io/project-ciftp/participant-service:main
+        image: harbor.sorakh.io/project-ciftp/participant-service:main
+        envFrom:
+          - configMapRef:
+              name: ciftp-env
         env:
         - name: DB_USER
           value: "${PARTICIPANT_DB_USER}"
@@ -109,9 +124,14 @@ spec:
       labels:
         app: request-change-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
       - name: request-change-service
-        image: https://harbor.sorakh.io/project-ciftp/ciftp-core-rqc:main
+        image: harbor.sorakh.io/project-ciftp/ciftp-core-rqc:main
+        envFrom:
+          - configMapRef:
+              name: ciftp-env
         env:
         - name: DB_USER
           value: "${RQC_DB_USER:}"
@@ -126,7 +146,7 @@ kind: Deployment
 metadata:
   name: notification-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: notification-service
@@ -135,27 +155,20 @@ spec:
       labels:
         app: notification-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: notification-service
-          image: https://harbor.sorakh.io/project-ciftp/notification-service:main
+          image: harbor.sorakh.io/project-ciftp/notification-service:main
+          envFrom:
+          - configMapRef:
+              name: ciftp-env
           env:
             - name: DB_USER
               value: "${NOTIFICATION_USER}"
             - name: DB_PASSWORD
               value: "${NOTIFICATION_PASSWORD}"
-            - name: MAIL_HOST
-              value: "${MAIL_HOST}"
-            - name: MAIL_PORT
-              value: "${MAIL_PORT}"
-            - name: MAIL_USER
-              value: "${MAIL_USER}"
-            - name: MAIL_PASSWORD
-              value: "${MAIL_PASSWORD}"
-            - name: MAIL_SSL_ENABLE
-              value: "${MAIL_SSL_ENABLE:-true}"
       restartPolicy: Always
-  dependsOn:
-    - name: service-registry
 
 
 ---
@@ -173,17 +186,20 @@ spec:
       labels:
         app: transaction-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: transaction-service
-          image: https://harbor.sorakh.io/project-ciftp/transaction-service:main
+          image: harbor.sorakh.io/project-ciftp/transaction-service:main
+          envFrom:
+          - configMapRef:
+              name: ciftp-env
           env:
             - name: DB_USER
               value: "${TRX_USER}"
             - name: DB_PASSWORD
               value: "${TRX_USER_PASSWORD}"
       restartPolicy: Always
-  dependsOn:
-    - name: service-registry
 
 ---
 apiVersion: apps/v1
@@ -200,23 +216,19 @@ spec:
       labels:
         app: frontend-service
     spec:
+      imagePullSecrets:
+        - name: harbor-registry-secret
       containers:
         - name: frontend-service
-          image: https://harbor.sorakh.io/project-ciftp/ciftp-core-frontend:1.0.0-rc-6
+          image: harbor.sorakh.io/project-ciftp/ciftp-core-frontend:1.0.0-rc-6
+          envFrom:
+          - configMapRef:
+              name: ciftp-env
           env:
             - name: BACKEND_ADDR
-              value: "${BACKEND_ADDR}"
+              value: "http://10.10.200.218:30001"
             # Add other environment variables from *x-platform-manifest here
           ports:
             - containerPort: 80
       restartPolicy: Always
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
 
